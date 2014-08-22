@@ -197,7 +197,7 @@ for TOMCAT in ${PROJECT} ;do
     fi			
 	
     ### strutlog check ####################################
-    awk -F'"' '($1 !~ /118.242.160.50|118.242.2.240/ &&  $NF !~ /struts\.token\.name=token/ ){print $0}'  ${CUT_LOG_FILE} > ${TMP_LOG}
+    awk -F'"' '($1 !~ /192.168.0.1|192.168.0.3/ &&  $NF !~ /struts\.token\.name=token/ ){print $0}'  ${CUT_LOG_FILE} > ${TMP_LOG}
     
     if [ ! -s ${TMP_LOG} ]; then
         rm -f ${TMP_LOG}
