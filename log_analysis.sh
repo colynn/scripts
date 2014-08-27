@@ -7,6 +7,7 @@ export LANG=zh_CN.GB2312
 export  PATH=/usr/local/bin:$PATH
 master_mail=liu@example.com
 alert_mail=liu@example.com
+#alert_mail=liuyuan@pook.com
 
 ####Defined variables
 IPADD=`/sbin/ifconfig | grep "inet addr" | head -1 | awk '{print $2}'| awk -F ":" '{print $2}'`
@@ -18,7 +19,7 @@ DATE_LOG=`date +%Y%m%d-%H%M`
 DATE_YES_LOG=`date -d '1 days ago' +%Y%m%d-%H%M`
 UNBAN_DATE=`date -d "15 days ago" +"%Y%m%d"`
 
-##为避免与tmp的切割日志脚本冲突，定义在03:57-04:03检测脚本不执行。
+##为避免与nginx的切割日志脚本冲突，定义在03:57-04:03检测脚本不执行。
 DATE1=357  ###不运行脚本的开始时间;drop日志的分隔时间，357前输出到前一天的日志文件中
 DATE2=403  ###不运行脚本的结束时间
 RUN_DATE=`date +%k%M`
@@ -33,8 +34,8 @@ LOG_PATH=/tmp/
 PROJECT=$(find $LOG_PATH -type f -mtime -1 -size  +4k -regex "${LOG_PATH}/access_5?3?[a-z][0-9a-zA-Z-]*\.log" |awk -F'[/|_|.]' '{print $7}')
 
 ##project_filter_file
-PROJECT_FILTER=/tmp/abc.txt
-PROJECT_CONF=/tmp/tmp_log_script.conf
+PROJECT_FILTER=/nginx/project_hour_v2.txt
+PROJECT_CONF=/nginx/nginx_log_script.conf
 ##单个链接访问的倍数比较
 REQUEST_TIMES=3
 HIGH_TIMES=3.0
@@ -42,19 +43,19 @@ LOW_TIMES=0.3
 PV_CHECK_NUM=500
 PV_CHECK_URI_NUM=300
 
-CUT_LOG_PATH=/tmp/log
+CUT_LOG_PATH=/nginx/log
 
 ##pv log file
-PV_PATH=/tmp/pv
-MAIL_PATH=/tmp/pvmail
+PV_PATH=/nginx/pv
+MAIL_PATH=/nginx/pvmail
 MAIL_LOG=${MAIL_PATH}/pv_mail_${DATE_LOG}.log
 
 ##drop_ip log file
-DROP_PATH=/tmp/droplog
+DROP_PATH=/nginx/droplog
 DROP_LOG=${DROP_PATH}/drop_log_${DATE}.txt
 DROP_YES_LOG=${DROP_PATH}/drop_log_${DATE_YES}.txt
 
-UNBAN_PATH=/tmp/unbanlog
+UNBAN_PATH=/nginx/unbanlog
 UNBAN_LOG=${UNBAN_PATH}/unban_log_${DATE}.txt
 
 [ -d ${CUT_LOG_PATH} ] || mkdir ${CUT_LOG_PATH}
@@ -102,12 +103,12 @@ quiet_mail_value
 
 for TOMCAT in ${PROJECT} ;do
 
-    LOG_FILE=/tmp/logs/access_${TOMCAT}.log
+    LOG_FILE=/usr/local/nginx/logs/access_${TOMCAT}.log
         
     CUT_LOG_FILE=${CUT_LOG_PATH}/hour_${TOMCAT}_${DATE_LOG}.log
     TMP_LOG=${CUT_LOG_PATH}/.hour_${TOMCAT}_${DATE_LOG}.tmp
 
-    STRUTSLOG=/tmp/strutslog/${TOMCAT}-${DATE}-struts.txt
+    STRUTSLOG=/nginx/strutslog/${TOMCAT}-${DATE}-struts.txt
 
     PV_LOG=${PV_PATH}/pv_${TOMCAT}_${DATE_LOG}.log
     PV_YES_LOG=${PV_PATH}/pv_${TOMCAT}_${DATE_YES_LOG}.log
@@ -141,7 +142,7 @@ for TOMCAT in ${PROJECT} ;do
     [ -s ${CUT_LOG_FILE} ] || continue
     PV_SUM=`wc -l  ${CUT_LOG_FILE} |awk '{print $1}'`
     echo "${TOMCAT}:${PV_SUM}" > ${PV_LOG}
-    awk -F'"|?' '{R[$3]++}END{for (i in R) print R[i]"-"i}' ${CUT_LOG_FILE} |sort -nr >> ${PV_LOG}
+    awk -F'"|?' '{R[$3]++}END{for (i in R) print R[i]"\""i}' ${CUT_LOG_FILE} |sort -nr >> ${PV_LOG}
         
     ###日志pv量统计
     PV_YES_SUM=1
@@ -152,52 +153,39 @@ for TOMCAT in ${PROJECT} ;do
     fi
     [ -z "${PV_YES_SUM}" ] && PV_YES_SUM=1
     pv_times=`echo "${PV_SUM} ${PV_YES_SUM}" |awk '{printf "%.1f\n",$1/$2}'`
-	awk -v URI_NUM=${PV_CHECK_URI_NUM} -F'-' '($2 !="" && NR==FNR ){a[$2]=$1}($2 !="" && NR>FNR) && ($1 > URI_NUM || a[$2]>URI_NUM ) {if($2 in a){printf ("%s\t%-40s\t%-5s\t%-40s\tratio:%-.1f\n", $1,$2,a[$2],$2,$1/a[$2])} else{printf ("%s\t%-40s\tratio:%-5s\n",$1,$2,$1)}}' ${PV_YES_LOG} ${PV_LOG} > ${PV_TMP_LOG}
+	awk -v URI_NUM=${PV_CHECK_URI_NUM} -F'"' '($2 !="" && NR==FNR ){a[$2]=$1}($2 !="" && NR>FNR) && ($1 > URI_NUM || a[$2]>URI_NUM ) {if($2 in a){printf ("%s\t%-40s\t%-5s\t%-40s\tratio:%-.1f\n", $1,$2,a[$2],$2,$1/a[$2])} else{printf ("%s\t%-40s\tratio:%-5s\n",$1,$2,$1)}}' ${PV_YES_LOG} ${PV_LOG} > ${PV_TMP_LOG}
     awk -v TIMES=${REQUEST_TIMES} -v LOW_TIMES=${LOW_TIMES} -F':' '($NF > TIMES || $NF < LOW_TIMES ){print}' ${PV_TMP_LOG} > ${PV_MAIL_LOG}
     rm -f  ${PV_TMP_LOG}
 
     ###检测是否发送pv量相关邮件
     if [ "${QUIET_MAIL}" -ne "0" ];then
-        rm -rf  ${PV_MAIL_LOG}
+        rm -f  ${PV_MAIL_LOG}
     else
-        if [ "${PV_SUM}" -gt "${PV_YES_SUM}" ]; then   
-            if [ "${PV_SUM}" -gt "${PV_CHECK_NUM}" ]; then
-                if [[ "${pv_times}" > "${HIGH_TIMES}" ]]; then
+        if [ "${PV_SUM}" -gt "${PV_CHECK_NUM}" ] || [ "${PV_YES_SUM}" -gt "${PV_CHECK_NUM}" ]; then
+            if [[ "${pv_times}" > "${HIGH_TIMES}" ]] || [[ "${pv_times}" < "${LOW_TIMES}" ]]; then
                 echo >> ${MAIL_LOG}
                 echo "###########################" >> ${MAIL_LOG}
-                echo "${TOMCAT} pv total: ${PV_SUM}" >> ${MAIL_LOG}
-                echo "${DATE_LOG}: ${TOMCAT} pv: ${PV_SUM}, More than ${HIGH_TIMES} times of yesterday pv: ${PV_YES_SUM}." >> ${MAIL_LOG}
-                    if [ -s "${PV_MAIL_LOG}" ]; then 
-                        echo "today_num----request_uri--------yesterday_num----request_uri----ratio:" >> ${MAIL_LOG}
-                        cat ${PV_MAIL_LOG}  >> ${MAIL_LOG}
-                    fi
-                else
-                    if [ -s "${PV_MAIL_LOG}" ]; then 
-                        echo >> ${MAIL_LOG}
-                        echo "###########################" >> ${MAIL_LOG}
-                        echo "${TOMCAT} pv total: ${PV_SUM}" >> ${MAIL_LOG}
-                        echo "today_num----request_uri--------yesterday_num----request_uri----ratio:" >> ${MAIL_LOG}
-                        cat ${PV_MAIL_LOG}  >> ${MAIL_LOG}
-                    fi
+                [[ "${pv_times}" > "${HIGH_TIMES}" ]] && echo "${DATE_LOG}:  ${TOMCAT} pv : ${PV_SUM};  Yesterday pv: ${PV_YES_SUM}    Ratio: ${pv_times} > ${HIGH_TIMES}." >> ${MAIL_LOG}
+                [[ "${pv_times}" < "${LOW_TIMES}" ]] && echo "${DATE_LOG}:  ${TOMCAT} pv : ${PV_SUM};  Yesterday pv: ${PV_YES_SUM}    Ratio: ${pv_times} < ${LOW_TIMES}." >> ${MAIL_LOG}
+                if [ -s "${PV_MAIL_LOG}" ]; then 
+                echo "today_num------request_uri--------yesterday_num----request_uri----ratio:" >> ${MAIL_LOG}
+                cat ${PV_MAIL_LOG}  >> ${MAIL_LOG}
                 fi
-            fi
-        else
-            if [ "${PV_YES_SUM}" -gt "${PV_CHECK_NUM}" ] && [[ "${pv_times}" < "${LOW_TIMES}" ]]; then
+            else
+                if [ -s "${PV_MAIL_LOG}" ]; then 
                 echo >> ${MAIL_LOG}
                 echo "###########################" >> ${MAIL_LOG}
-                echo "${TOMCAT} pv total: ${PV_SUM}" >> ${MAIL_LOG}
-                echo "${DATE_LOG}: ${TOMCAT} pv: ${PV_SUM}, Less than ${LOW_TIMES} times of yesterday pv: ${PV_YES_SUM}." >> ${MAIL_LOG}
-                    if [ -s "${PV_MAIL_LOG}" ]; then
-                        echo "today_num----request_uri--------yesterday_num----request_uri----ratio:" >> ${MAIL_LOG}
-                        cat ${PV_MAIL_LOG}  >> ${MAIL_LOG}
-                    fi
+                echo "${DATE_LOG}:  ${TOMCAT} pv : ${PV_SUM};  Yesterday pv: ${PV_YES_SUM}    Ratio: ${pv_times}." >> ${MAIL_LOG}
+                echo "today_num------request_uri--------yesterday_num----request_uri----ratio:" >> ${MAIL_LOG}
+                cat ${PV_MAIL_LOG} >> ${MAIL_LOG}
+                fi
             fi
         fi
         [ -f ${PV_MAIL_LOG} ] && rm -f ${PV_MAIL_LOG}
     fi			
 	
     ### strutlog check ####################################
-    awk -F'"' '($1 !~ /192.168.0.1|192.168.0.3/ &&  $NF !~ /struts\.token\.name=token/ ){print $0}'  ${CUT_LOG_FILE} > ${TMP_LOG}
+    awk -F'"' '($1 !~ /118.242.160.50|118.242.2.240/ && $3 !~ /redirect_icon.png/ &&  $NF !~ /struts\.token\.name=token/ ){print $0}'  ${CUT_LOG_FILE} > ${TMP_LOG}
     
     if [ ! -s ${TMP_LOG} ]; then
         rm -f ${TMP_LOG}
@@ -206,10 +194,10 @@ for TOMCAT in ${PROJECT} ;do
 
     LINE=`wc -l ${TMP_LOG} | awk '{print $1}'`
        
-    if [ ${LINE} -gt 20 ] && [ ! -f /tmp/strutslog/${TOMCAT}_tmp_v2.sendmail ] && [ ${TOMCAT}x != statusx ]; then
+    if [ ${LINE} -gt 20 ] && [ ! -f /nginx/strutslog/${TOMCAT}_tmp_v2.sendmail ] && [ ${TOMCAT}x != statusx ]; then
         echo "${TOMCAT} resolve to ${IPADD}." | /bin/mail  -s "${TOMCAT}_resolve_to_${IPADD}" ${alert_mail}
     fi
-    [ ${LINE} -gt 20 ] &&  touch /tmp/strutslog/${TOMCAT}_tmp_v2.sendmail
+    [ ${LINE} -gt 20 ] &&  touch /nginx/strutslog/${TOMCAT}_tmp_v2.sendmail
 
     if [ ${LINE} -gt 10 ]; then  
         awk -F'"' '$3$NF~/struts|redirect|classLoader/{print $0}' ${TMP_LOG} > ${STRUTSLOG}
@@ -285,7 +273,7 @@ if [ "${RUN_DATE}" -ge "${MAIL_DATE1}" -a  "${RUN_DATE}" -le "${MAIL_DATE2}" ];t
 	[ -s ${DROP_YES_LOG} ] && /bin/mail -s "${IPADD}_${DATE_YES}_drop_ip" ${alert_mail} < ${DROP_YES_LOG}
 	
 	###Delete the log for a long time###
-	find ${CUT_LOG_PATH} -type f -cmin +720 -name "hour_*.log" -exec rm -f {} \;
+	find ${CUT_LOG_PATH} -type f -mtime +3 -name "hour_*.log" -exec rm -f {} \;
 	find ${PV_PATH} -type f -mtime +3 -name "*.log" -exec rm -f {} \;
 	## pvmail log file.
 	find ${MAIL_PATH} -type f -mtime +30 -name "*.log" -exec rm -f {} \;
@@ -294,8 +282,8 @@ if [ "${RUN_DATE}" -ge "${MAIL_DATE1}" -a  "${RUN_DATE}" -le "${MAIL_DATE2}" ];t
 	## unban_ip log file
 	find ${UNBAN_PATH} -type f -mtime +30 -name "*.txt" -exec rm -f {} \;
 	## struts.log file save 1 month
-	find /tmp/strutslog/ -type f -mtime +30 -name "*.txt" -exec rm -f {} \;
+	find /nginx/strutslog/ -type f -mtime +30 -name "*.txt" -exec rm -f {} \;
 fi
 
 ## nginx paring  lock file. save 1 day
-find /tmp/strutslog/ -type f -mtime +1 -name "*.sendmail" -exec rm -f {} \;
+find /nginx/strutslog/ -type f -mtime +1 -name "*.sendmail" -exec rm -f {} \;
