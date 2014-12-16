@@ -4,7 +4,7 @@
 #
 # description: script to launch Tomcat on boot
 #
-#mailto: colynn.liu@chinanetcloud.com
+#mailto: colynn.liu
 
 CATALINA_USER=root
 CATALINA_HOME=/usr/local/tomcat7
