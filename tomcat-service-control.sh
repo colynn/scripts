@@ -13,10 +13,8 @@ CATALINA_CMD="${CATALINA_BIN}/catalina.sh"
 #JAVA_HOME=""
 CATALINA_PID=${CATALINA_HOME}/var/catalina.pid
 
-
+#define status variable
 RETVAL=0
-prog=tomcat7
-
 
 case "$1" in
     start)
