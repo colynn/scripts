@@ -10,8 +10,8 @@ CATALINA_USER=tomcat
 CATALINA_HOME=/opt/tomcat1
 CATALINA_BIN="${CATALINA_HOME}/bin"
 CATALINA_CMD="${CATALINA_BIN}/catalina.sh"
-CATALINA_PID=${CATALINA_HOME}/var/catalina.pid
-CATALINA_OUT=${CATALINA_HOME}/logs/catalina.out
+CATALINA_PID="${CATALINA_HOME}/var/catalina.pid"
+CATALINA_OUT="${CATALINA_HOME}/logs/catalina.out"
 
 ##jmx
 #jmx seting will read ${CATALINA_HOME}/bin/setenv.sh
@@ -37,17 +37,32 @@ stop(){
         if [ ! -f "$CATALINA_PID" ]; then
                 echo "$CATALINA_PID does not exist; process does not exist or has gone rogue" 1>&2
         else
-        PID=$(cat $CATALINA_PID)
+        	PID=$(cat $CATALINA_PID)
         echo "Stopping..."
-        su - $CATALINA_USER -c "kill -9 ${PID}"
+        su - $CATALINA_USER -c "${CATALINA_CMD} stop"
         while [ -x "/proc/${PID}" ]; do
                 echo "waiting for Shutdown..."
                 sleep 1
         done
-        rm $CATALINA_PID
         echo "$CATALINA_HOME tomcat stopped is ok."
         fi
 }
+
+stop-force(){
+        if [ ! -f "$CATALINA_PID" ]; then
+                echo "$CATALINA_PID does not exist; process does not exist or has gone rogue" 1>&2
+        else
+        	PID=$(cat $CATALINA_PID)
+        echo "Stopping..."
+        su - $CATALINA_USER -c "${CATALINA_CMD} stop -force"
+        while [ -x "/proc/${PID}" ]; do
+                echo "waiting for Shutdown..."
+                sleep 1
+        done
+        echo "$CATALINA_HOME tomcat stopped is ok."
+        fi
+}
+
 case "$1" in
    start)
 	start
@@ -69,12 +84,15 @@ case "$1" in
     stop)
 	stop
 	;;
+    stop-force)
+	stop-force
+	;;
     restart)
 	stop
  	sleep 1
 	start
 	;;
     *)
-        echo $"Usage: $0 {start|stop|restart|status}"
+        echo $"Usage: $0 {start|stop|stop-force|restart|status}"
 	;;
 esac
