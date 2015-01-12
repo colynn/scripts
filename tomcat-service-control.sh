@@ -11,7 +11,7 @@ CATALINA_HOME=/opt/tomcat1
 CATALINA_BIN="${CATALINA_HOME}/bin"
 CATALINA_CMD="${CATALINA_BIN}/catalina.sh"
 CATALINA_PID="${CATALINA_HOME}/var/catalina.pid"
-CATALINA_OUT="${CATALINA_HOME}/logs/catalina.out"
+CATALINA_OUT=${CATALINA_HOME}/logs/catalina.out
 
 ##jmx
 #jmx seting will read ${CATALINA_HOME}/bin/setenv.sh
@@ -96,3 +96,4 @@ case "$1" in
         echo $"Usage: $0 {start|stop|stop-force|restart|status}"
 	;;
 esac
+
