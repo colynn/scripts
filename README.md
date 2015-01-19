@@ -1,4 +1,4 @@
-shell-scripts
-=============
+scripts collect
+=================
 
-collect  shell-scripts in  my work
+collect  shell/python-scripts in my work or practice
