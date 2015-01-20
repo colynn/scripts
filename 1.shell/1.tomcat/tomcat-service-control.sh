@@ -20,16 +20,12 @@ CATALINA_OUT="${CATALINA_HOME}/logs/catalina.out"
 RETVAL=0
 
 start() {
-	if [ -f "$CATALINA_PID" ]; then
-        echo "$CATALINA_PID already exists; process is already running or crashed" 1>&2
-        else
         echo "Starting Tomcat..."
-        su - $CATALINA_USER -c "${CATALINA_CMD} start"
+        su - $CATALINA_USER -c "${CATALINA_CMD} start"  ##catalina.sh script can control tomcat whether start or not. do't need judge pid file.
         RETVAL=$?
-          if [ $RETVAL -eq 0 ] ; then
+        if [ $RETVAL -eq 0 ] ; then
              echo "$CATALINA_HOME tomcat start is ok."
 	     echo "${CATALINA_OUT} log get more infomation."
-          fi
         fi
 }
 
